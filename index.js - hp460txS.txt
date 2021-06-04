@@ -1,0 +1,11 @@
+"use strict";
+import { registerServices } from '@sirensolutions/web-service-interface';
+import { MyWeatherService } from './MyWeatherService';
+import { VTserviceIP } from './VTserviceIP';
+import { VTserviceDomain } from './VTserviceDomain';
+//export default registerServices('example-web-service-group', [VTservice],[MyWeatherService]);
+//export default registerServices('example-web-service-group', [MyWeatherService], [VTservice]);
+//export default registerServices('example-web-service-group', [MyWeatherService]);
+//export default registerServices('example-web-service-group', [VTservice], [VTserviceDomain]);
+//export default registerServices('example-web-service-group', [VTserviceDomain]);
+export default registerServices('virus-total', [VTserviceIP,VTserviceDomain]);

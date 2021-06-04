@@ -1,0 +1,88 @@
+"use strict"
+import { ServiceDefinition, WebServiceError } from '@sirensolutions/web-service-interface';
+import axios from 'axios';
+
+export class VTserviceIP extends ServiceDefinition {
+  name = 'vtservice IP';
+  inputSchema = {
+    ip_address: {
+      type: 'keyword',
+      description: 'IP address',
+      required: true
+    }
+  };
+  outputConfiguration = {
+    ip_result: {
+        network: 'text',
+        type: 'text',
+        owner:'text',
+        ip:'keyword',
+        links: 'text',
+        reputation:'long',
+        last_analysis_stats_harmless: 'long',
+        last_analysis_stats_malicious: 'long',
+        last_analysis_stats_suspicious: 'long',
+        last_analysis_stats_undetected: 'long',
+        last_analysis_stats_timeout: 'long',
+        last_analysis_statsFlat: 'text',
+        last_analysis_resultsFlat: 'text',
+        //comment out next two lines on first run
+        last_analysis_stats: 'text',
+        last_analysis_results: 'text',
+        //
+        whois: 'text',
+   }
+  };
+  // Called to invoke the service. The inputs argument will have fields described in this.inputSchema
+  async invoke(inputs) {
+    // The API endpoint to send a query to
+    const url = 'https://www.virustotal.com/api/v3/ip_addresses/'+inputs.ip_address;
+
+
+    // Parameters are added to the end of a URL:
+    // E.g.  https://api.openweathermap.org/data/2.5/weather?q=London&appid=<your-api-key>
+    const params = {      q: inputs.ip_address,
+      //appid: '4f0d6e395b2f091b03fef586d805a6c6'
+    }
+    const headers = {
+      'x-apikey': '32f9b0c0e4b6026bf35f0c55669a2b11e2986c16bfe7e5a29009db68c1bcc0bd'
+//      'Content-Type': 'application/json'
+    }
+
+    // The axios library is used here, but you can use a different library/implementation for querying an API
+    //const response = await axios.get(url, { params, headers })
+    //const response = await axios.get('https://www.virustotal.com/api/v3/ip_addresses/8.8.8.8',{headers})
+    const response = await axios.get(url,{headers})
+      .catch(error => Promise.reject(error.response && error.response.status < 500 ? new WebServiceError(error.response.data) : error));
+
+    // Must return objects with the same structure as in this.outputConfiguration. These are stored in Elasticsearch automatically.
+console.log(response.data);
+//console.log(response.data.data.attributes.network);
+//console.log(response.data.data.type);
+//console.log(response.data.data.links.self);
+console.log(response.data.data.attributes.last_analysis_stats);
+//console.log(response.data.data.attributes.whois);
+//console.log(response.data.data.attributes.last_analysis_results);
+
+    return {
+      ip_result: [{
+        network: response.data.data.attributes.network,
+        type: response.data.data.type,
+        owner: response.data.data.attributes.as_owner,
+        ip: response.data.data.id,
+        links: response.data.data.links.self,
+        reputation: response.data.data.attributes.reputation,
+        last_analysis_stats_harmless: response.data.data.attributes.last_analysis_stats.harmless,
+        last_analysis_stats_malicious: response.data.data.attributes.last_analysis_stats.malicious,
+        last_analysis_stats_suspicious: response.data.data.attributes.last_analysis_stats.suspicious,
+        last_analysis_stats_undetected: response.data.data.attributes.last_analysis_stats.undetected,
+        last_analysis_stats_timeout: response.data.data.attributes.last_analysis_stats.timeout,
+        last_analysis_statsFlat: JSON.stringify(response.data.data.attributes.last_analysis_stats),
+        last_analysis_resultsFlat: JSON.stringify(response.data.data.attributes.last_analysis_results),
+        //comment out next two lines on first run
+        last_analysis_stats: response.data.data.attributes.last_analysis_stats,
+        last_analysis_results: response.data.data.attributes.last_analysis_results,
+        //
+        whois: response.data.data.attributes.whois,    }]};
+  }
+}

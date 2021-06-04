@@ -1,0 +1,138 @@
+
+const invocationToResultRelation = 'relation:4bbfdc80-086b-11eb-93dc-23402d3cb31b'; //set later in script, can be deleted.
+// const invocationToResultRelation = 'relation: 4b790f80-086b-11eb-9b82-992be2106724';
+
+
+var malwareSearchId = null
+var toolSearchId = null
+
+function beforeAll(graphId, graphModel, graphSelection) {
+  var selection = [];
+  var selectionSet = new Set(graphSelection);
+  _.each(graphModel.nodes, function (node) {
+    if (!f.isNodeCombo(graphId, node.id) && selectionSet.has(node.id)) {
+      selection.push(node);
+    }
+  });
+
+  console.log('selection: '+selection);
+  console.log(f);
+  console.log('graphId: '+graphId);
+  
+  return f.getInvestigateEntities()
+    .then(function (entities) {
+      entities.forEach(function(entity) {
+        //console.log('entity.label'+entity.label)
+        //console.log('entity.id'+entity.id)
+        if (entity.label == 'mitre-malware' && entity.type == 'SAVED_SEARCH') {
+          //console.log('   Found MALWARE')
+          malwareSearchId = entity.id
+        }
+        if (entity.label == 'syslog-ng' && entity.type == 'SAVED_SEARCH') {
+          console.log('   Found Suricata Alert: entity.id = ' + entity.id)
+          //test entity.id is search:7900e5e0-a3a7-11eb-baa9-8568057091c3
+          toolSearchId = entity.id
+        }
+      }
+      )
+    //console.log('MALWARE search ID is ' + malwareSearchId)
+    console.log('Alert search ID is ' + toolSearchId)
+  
+    let queryString = null
+    console.log('Node is ' + selection[0].entityId)
+  
+    if (selection.length !== 1) {
+      throw new Error('Must select only one node!');
+    } else if (selection[0].entityId == malwareSearchId) {
+      console.log(selection[0].payload)
+      // queryString = selection[0].payload.x_mitre_aliases
+      queryString = selection[0].label
+    } else if (selection[0].entityId == toolSearchId) {
+      console.log('antano2')
+      console.log(selection[0].payload)
+      console.log(selection[0].payload.HOST)
+      // queryString = selection[0].payload.x_mitre_aliases
+      queryString = selection[0].payload.suricata.dest_ip  //attribute value from highlighted icon you want to search on
+      //queryString = selection[0].label     
+    } else {
+      throw new Error('Expected either a Malware or a Tool node selection[0].label '+selection[0].label + ' malwareSearchId '+malwareSearchId)
+    }
+    
+    if (Array.isArray(queryString)) {
+      queryString = queryString.join(' ')
+    }
+    console.log('Query string is: ' + queryString)
+    
+    const Http = new XMLHttpRequest();
+    //const url='../../api/web_services/Google/news/_invoke';   //invocation of the web services script
+    const url='../../api/web_services/virus-total/vtservice%20IP/_invoke';
+
+
+    Http.open("POST", url);
+    Http.setRequestHeader("Content-Type", "application/json");
+    Http.setRequestHeader("kbn-xsrf", "kibana");
+    Http.send('{"ip_address": "' + queryString + '"}'); //attribute and value for elastic query of invocation table
+
+    
+    
+    return new Promise((resolve, reject) => Http.onload = () => {
+      console.log(Http.status)
+      console.log(Http)
+      
+      if (Http.status === 200) {
+        console.log('resolving with ' + Http.responseText)
+        resolve(Http.responseText)
+      } else {
+        console.log('rejecting with ' + Http.responseText)
+        reject(Http.responseText)
+      }
+    })
+      .then(id => {
+        console.log('Invocation id: ' + id);
+        //relation:fc48ade0-af53-11eb-b6b4-f5b4ad45b190   invocation to results relation
+        //relation:c79ba450-af51-11eb-9e59-079961dc4f3d" invocation to source relation
+        //search:6888a710-af51-11eb-b797-9f46d4637941 -- search id for invocations index
+        const invocationToResultRelation = 'relation:fc48ade0-af53-11eb-b6b4-f5b4ad45b190';
+        const invocationToSourceObjectRelation = 'relation: c79ba450-af51-11eb-9e59-079961dc4f3d'
+        const invocationSourceIndexSearch = 'search:6888a710-af51-11eb-b797-9f46d4637941'
+        const query =    `g.V($1).bothE("${invocationToResultRelation}").as("e").bothV().as("v").select("e", "v").mapValues()`;
+        const entities = `web-service-virus-total-vtservice-ip-invocations/_doc/${id}`;
+        console.log('invocation to result id:' + invocationToResultRelation);
+        console.log('entities:' + entities);
+        console.log('query: ' + query);
+        /////////// return f.executeGremlinQuery(graphId, query, entities);
+        // debugger
+        //return f._fetchVerticesAdd(graphId, [entities], false, 'search:f8677f20-086a-11eb-93dc-23402d3cb31b')
+        //.then(function() {
+        //  return f.defaultExpansion(graphId, [entities], ['relation:4bbfdc80-086b-11eb-93dc-23402d3cb31b', 'relation: 4b790f80-086b-11eb-9b82-992be2106724']);
+        //return f._fetchVerticesAdd(graphId, [entities], false, 'search:6888a710-af51-11eb-b797-9f46d4637941')
+        //.then(function() {
+        //  return f.defaultExpansion(graphId, [entities], ['relation: c79ba450-af51-11eb-9e59-079961dc4f3d','relation:fc48ade0-af53-11eb-b6b4-f5b4ad45b190']);
+        return f._fetchVerticesAdd(graphId, [entities], false, invocationSourceIndexSearch)
+        .then(function() {
+          return f.defaultExpansion(graphId, [entities], [invocationToSourceObjectRelation,invocationToResultRelation ]);
+        })
+        
+      })
+      .then(results => {
+        //_.each(results, function (item) {
+        //  if (item.type === 'vertex') {
+        //    if (!item.properties._entityId) {
+        //      item.properties._entityId = [{ id: 1, value: 'search:f8677f20-086a-11eb-93dc-23402d3cb31b'}];
+        //    }
+        //  }
+        //});
+        console.log('==============================')
+        console.log('graphSelection', graphSelection);
+        console.log('graphId', graphId);
+        console.log('results', results);
+        console.log('==============================')
+        return f.addResultsToGraph(graphId, graphSelection, results);
+      });
+      // .then(() => ({
+      //   model: null,
+      //   selection: null
+      // }))
+    }
+    )
+  }

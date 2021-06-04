@@ -1,0 +1,101 @@
+"use strict"
+import { ServiceDefinition, WebServiceError } from '@sirensolutions/web-service-interface';
+import axios from 'axios';
+
+export class VTserviceDomain extends ServiceDefinition {
+  name = 'vtservice domain';
+  inputSchema = {
+    domain_address: {
+      type: 'keyword',
+      description: 'Domain address',
+      required: true
+    }
+  };
+  outputConfiguration = {
+    domain_result: {
+        network: 'text',
+        //dns:'text',
+        type: 'text',
+        owner:'text',
+        domain:'keyword',
+        links: 'text',
+        reputation:'long',
+        last_analysis_stats_harmless: 'long',
+        last_analysis_stats_malicious: 'long',
+        last_analysis_stats_suspicious: 'long',
+        last_analysis_stats_undetected: 'long',
+        last_analysis_stats_timeout: 'long',
+        last_analysis_statsFlat: 'text',
+        last_analysis_resultsFlat: 'text',
+        //comment out the next four lines on first execution
+        last_analysis_stats: 'text',
+        last_analysis_results: 'text',
+        popularity_ranks:'text',
+        categories:'text',
+        //end
+        whois: 'text'
+   }
+  };
+  // Called to invoke the service. The inputs argument will have fields described in this.inputSchema
+  async invoke(inputs) {
+    // The API endpoint to send a query to
+    const url = 'https://www.virustotal.com/api/v3/domains/'+inputs.domain_address;   // Parameters are added to the end of a URL:
+    // E.g.  https://api.openweathermap.org/data/2.5/weather?q=London&appid=<your-api-key>
+    const params = {
+      q: inputs.domain_address,
+      //appid: '4f0d6e395b2f091b03fef586d805a6c6'
+    }
+    const headers = {
+      'x-apikey': '32f9b0c0e4b6026bf35f0c55669a2b11e2986c16bfe7e5a29009db68c1bcc0bd',
+      'Content-Type': 'application/json'
+    }
+
+    // The axios library is used here, but you can use a different library/implementation for querying an API
+    //const response = await axios.get(url, { params, headers })
+    //const response = await axios.get('https://www.virustotal.com/api/v3/ip_addresses/8.8.8.8',{headers})
+    const response = await axios.get(url,{headers})
+      .catch(error => Promise.reject(error.response && error.response.status < 500 ? new WebServiceError(error.response.data) : error));
+
+
+
+    console.log(response.data);
+    console.log(response.status);
+    console.log(response.statusText);
+    console.log(response.headers);
+    console.log(response.config);
+
+    // Must return objects with the same structure as in this.outputConfiguration. These are stored in Elasticsearch automatically.
+    console.log(response.data.data.attributes.last_analysis_results);
+    console.log(response.data.data.attributes.last_analysis_stats);
+//console.log(typeof response.data.data.attributes.last_analysis_stats)
+//var arr = JSON.parse(response.data.data.attributes.last_analysis_stats);
+//var text = arr.text;
+//console.log(JSON.stringify(response.data.data.attributes.last_analysis_stats));
+//console.log(JSON.stringify(response.data.data.attributes.last_analysis_results));
+
+    return {
+      domain_result: [{
+        network: response.data.data.attributes.network,
+        //dns: response.data.data.attributes.last_dns_records[0],
+        type: response.data.data.type,
+        owner: response.data.data.attributes.as_owner,
+        domain: response.data.data.id,
+        links: response.data.data.links.self,
+        reputation: response.data.data.attributes.reputation,
+        last_analysis_stats_harmless: response.data.data.attributes.last_analysis_stats.harmless,        last_analysis_stats_malicious: response.data.data.attributes.last_analysis_stats.malicious,
+        last_analysis_stats_suspicious: response.data.data.attributes.last_analysis_stats.suspicious,
+        last_analysis_stats_undetected: response.data.data.attributes.last_analysis_stats.undetected,
+        last_analysis_stats_timeout: response.data.data.attributes.last_analysis_stats.timeout,
+        last_analysis_statsFlat: JSON.stringify(response.data.data.attributes.last_analysis_stats),
+        last_analysis_resultsFlat: JSON.stringify(response.data.data.attributes.last_analysis_results),
+        //comment out next four lines on first run
+        last_analysis_stats: response.data.data.attributes.last_analysis_stats,
+        last_analysis_results: response.data.data.attributes.last_analysis_results,
+        popularity_ranks: response.data.data.attributes.popularity_ranks,
+        categories: response.data.data.attributes.categories,
+        //
+        whois: response.data.data.attributes.whois
+    }]};
+  }
+}
+
